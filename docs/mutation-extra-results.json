@@ -1,0 +1,201 @@
+{
+  "manual_mutations": [
+    {
+      "name": "name_limit",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]",
+      "after": "Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=201)]"
+    },
+    {
+      "name": "manufacturer_limit",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "manufacturer: Annotated[str, Field(max_length=200)]",
+      "after": "manufacturer: Annotated[str, Field(max_length=201)]"
+    },
+    {
+      "name": "description_limit",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "description: Annotated[str, Field(max_length=20000)]",
+      "after": "description: Annotated[str, Field(max_length=20001)]"
+    },
+    {
+      "name": "spec_value_limit",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "Text = Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)]",
+      "after": "Text = Annotated[str, StringConstraints(strip_whitespace=True, max_length=1001)]"
+    },
+    {
+      "name": "spec_count_limit",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "specs: Annotated[dict[Name, Text], Field(max_length=100)]",
+      "after": "specs: Annotated[dict[Name, Text], Field(max_length=101)]"
+    },
+    {
+      "name": "strict_input",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "strict=True",
+      "after": "strict=False"
+    },
+    {
+      "name": "extra_fields",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "extra=\"forbid\"",
+      "after": "extra=\"ignore\""
+    },
+    {
+      "name": "strip_whitespace",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "strict=True, str_strip_whitespace=True",
+      "after": "strict=True, str_strip_whitespace=False"
+    },
+    {
+      "name": "has_facts_or_and",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "self.description or any(self.specs.values())",
+      "after": "self.description and any(self.specs.values())"
+    },
+    {
+      "name": "seo_min_length",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "seo_description: Annotated[str, Field(min_length=800, max_length=1200)]",
+      "after": "seo_description: Annotated[str, Field(min_length=801, max_length=1200)]"
+    },
+    {
+      "name": "seo_max_length",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "seo_description: Annotated[str, Field(min_length=800, max_length=1200)]",
+      "after": "seo_description: Annotated[str, Field(min_length=800, max_length=1201)]"
+    },
+    {
+      "name": "title_max_length",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "seo_title: Annotated[str, Field(min_length=1, max_length=70)]",
+      "after": "seo_title: Annotated[str, Field(min_length=1, max_length=71)]"
+    },
+    {
+      "name": "query_min_count",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "search_queries: Annotated[list[Name], Field(min_length=3, max_length=5)]",
+      "after": "search_queries: Annotated[list[Name], Field(min_length=2, max_length=5)]"
+    },
+    {
+      "name": "query_max_count",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "search_queries: Annotated[list[Name], Field(min_length=3, max_length=5)]",
+      "after": "search_queries: Annotated[list[Name], Field(min_length=3, max_length=6)]"
+    },
+    {
+      "name": "query_casefold",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "{v.casefold() for v in values}",
+      "after": "{v for v in values}"
+    },
+    {
+      "name": "unfinished_title",
+      "file": "product_cards/schemas.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "if value.endswith(",
+      "after": "if False and value.endswith("
+    },
+    {
+      "name": "provider_timeout",
+      "file": "product_cards/api.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "timeout=45.0",
+      "after": "timeout=46.0"
+    },
+    {
+      "name": "provider_retries",
+      "file": "product_cards/api.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "max_retries=0",
+      "after": "max_retries=1"
+    },
+    {
+      "name": "validation_input_leak",
+      "file": "product_cards/api.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "\"detail\": \"Некорректный JSON или поля товара\",",
+      "after": "\"detail\": \"Некорректный JSON или поля товара\", \"input\": exc.body,"
+    },
+    {
+      "name": "provider_error_status",
+      "file": "product_cards/api.py",
+      "status": "killed",
+      "exit_code": 1,
+      "before": "status_code=exc.status,",
+      "after": "status_code=exc.status + 1,"
+    }
+  ],
+  "timeout_rechecks": [
+    {
+      "mutant": "product_cards.api.xǁBodyLimitǁ__call____mutmut_51",
+      "result": "killed",
+      "exit_code": 1
+    },
+    {
+      "mutant": "product_cards.api.xǁBodyLimitǁ__call____mutmut_58",
+      "result": "killed",
+      "exit_code": 1
+    },
+    {
+      "mutant": "product_cards.api.xǁBodyLimitǁ__call____mutmut_61",
+      "result": "killed",
+      "exit_code": 1
+    },
+    {
+      "mutant": "product_cards.api.xǁBodyLimitǁ__call____mutmut_62",
+      "result": "killed",
+      "exit_code": 1
+    },
+    {
+      "mutant": "product_cards.api.xǁBodyLimitǁ__call____mutmut_67",
+      "result": "killed",
+      "exit_code": 1
+    },
+    {
+      "mutant": "product_cards.api.xǁBodyLimitǁ__call____mutmut_68",
+      "result": "killed",
+      "exit_code": 1
+    },
+    {
+      "mutant": "product_cards.api.xǁBodyLimitǁ__call____mutmut_75",
+      "result": "killed",
+      "exit_code": 1
+    }
+  ]
+}
