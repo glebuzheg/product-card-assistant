@@ -96,6 +96,13 @@ def use_provider(client, handler):
 def test_generate_with_real_sdk(client):
     def handler(request):
         body = json.loads(request.content)
+        assert body["model"] == "test-model"
+        assert isinstance(body["instructions"], str) and body["instructions"].strip()
+        assert isinstance(body["max_output_tokens"], int) and body["max_output_tokens"] > 0
+        assert body["input"][0]["role"] == "user"
+        assert body["text"]["format"]["type"] == "json_schema"
+        assert isinstance(body["text"]["format"]["name"], str)
+        assert body["text"]["format"]["name"].strip()
         assert body["store"] is False
         assert body["text"]["format"]["strict"] is True
         assert json.loads(body["input"][0]["content"]) == PRODUCT
@@ -106,6 +113,9 @@ def test_generate_with_real_sdk(client):
     assert response.status_code == 200
     assert response.json()["characteristics"] == {"Диапазон": "0–100 гПа"}
     assert response.json()["status"] == "ok"
+    for field in ("seo_title", "seo_description", "commercial_block", "search_queries"):
+        expected = DRAFT[field].strip() if isinstance(DRAFT[field], str) else DRAFT[field]
+        assert response.json()[field] == expected
 
 
 def test_repairs_once(client):
@@ -122,6 +132,7 @@ def test_repairs_once(client):
     response = client.post("/generate", json=PRODUCT)
     assert response.status_code == 200
     assert len(attempts) == 2
+    assert attempts[1]["input"][-1]["role"] == "user"
     assert "Исправь" in attempts[1]["input"][-1]["content"]
     assert attempts[1]["input"][-2]["role"] == "assistant"
     assert json.loads(attempts[1]["input"][-2]["content"])["seo_title"] == "x" * 71
@@ -137,6 +148,7 @@ def test_two_invalid_answers_fail_safely(client):
     use_provider(client, handler)
     response = client.post("/generate", json=PRODUCT)
     assert response.status_code == 502
+    assert isinstance(response.json()["detail"], str) and response.json()["detail"].strip()
     assert len(attempts) == 2
     assert "999" not in response.text
 
@@ -160,6 +172,9 @@ def test_provider_errors_are_safe(client, upstream, expected):
     )
     response = client.post("/generate", json=PRODUCT)
     assert response.status_code == expected
+    assert isinstance(response.json()["detail"], str) and response.json()["detail"].strip()
+    if upstream == 429:
+        assert "баланс" not in response.json()["detail"].lower()
     assert "SECRET_PROVIDER_DETAIL" not in response.text
     assert "test-not-a-secret" not in response.text
 
@@ -171,6 +186,7 @@ def test_timeout(client):
     use_provider(client, handler)
     response = client.post("/generate", json=PRODUCT)
     assert response.status_code == 504
+    assert isinstance(response.json()["detail"], str) and response.json()["detail"].strip()
     assert "SECRET_TIMEOUT" not in response.text
 
 
@@ -249,3 +265,95 @@ def test_evidence_source_paths_are_constrained_for_product(client):
 
     use_provider(client, handler)
     assert client.post("/generate", json=PRODUCT).status_code == 200
+
+
+@pytest.mark.parametrize("missing", ["client", "model"])
+def test_each_required_provider_setting_is_checked(client, missing):
+    use_provider(client, lambda r: pytest.fail("Provider must not be called without configuration"))
+    if missing == "client":
+        client.app.state.llm = None
+    else:
+        client.app.state.model = ""
+    response = client.post("/generate", json=PRODUCT)
+    assert response.status_code == 503
+    assert isinstance(response.json()["detail"], str) and response.json()["detail"].strip()
+
+
+@pytest.mark.parametrize(
+    "code,kind",
+    [
+        ("credit_balance_exhausted", "api_error"),
+        ("insufficient_quota", "api_error"),
+        ("other_code", "insufficient_quota"),
+    ],
+)
+def test_quota_can_be_identified_by_code_or_type(client, code, kind):
+    use_provider(
+        client,
+        lambda r: httpx.Response(
+            429, json={"error": {"message": "private", "code": code, "type": kind}}
+        ),
+    )
+    response = client.post("/generate", json=PRODUCT)
+    assert response.status_code == 429
+    assert "баланс" in response.json()["detail"].lower()
+
+
+def test_refusal_has_explanation(client):
+    use_provider(client, lambda r: httpx.Response(200, json=provider_response(refusal=True)))
+    response = client.post("/generate", json=PRODUCT)
+    assert response.status_code == 502
+    assert isinstance(response.json()["detail"], str) and response.json()["detail"].strip()
+
+
+@pytest.mark.parametrize("failure", ["source_quote", "claim", "number"])
+def test_quote_repair_identifies_invalid_evidence(client, failure):
+    from copy import deepcopy
+
+    requests = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        requests.append(body)
+        data = deepcopy(DRAFT)
+        if len(requests) == 1:
+            if failure == "number":
+                data["commercial_block"] = "Диапазон 999 МПа"
+            else:
+                data["evidence"][0][failure] = "Неизвестный источник"
+        return httpx.Response(200, json=provider_response(data))
+
+    use_provider(client, handler)
+    assert client.post("/generate", json=PRODUCT).status_code == 200
+    correction = requests[1]["input"][-1]
+    assert correction["role"] == "user"
+    reason = correction["content"].rsplit(": ", 1)[-1]
+    assert reason.strip() and reason != "None"
+    if failure != "number":
+        assert "evidence[0]" in correction["content"]
+        assert failure in correction["content"]
+
+
+def test_startup_configures_bounded_client_without_transport_retries(monkeypatch):
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(500, json={"error": {"message": "private", "type": "api_error"}})
+
+    def make_client(**kwargs):
+        return AsyncOpenAI(
+            **kwargs, http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        )
+
+    monkeypatch.setattr("product_cards.api.load_dotenv", lambda *args: None)
+    monkeypatch.setattr("product_cards.api.AsyncOpenAI", make_client)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-startup-key")
+    monkeypatch.setenv("OPENAI_MODEL", "configured-model")
+    with TestClient(app) as client:
+        provider = app.state.llm
+        assert client.post("/generate", json=PRODUCT).status_code == 502
+        assert len(requests) == 1
+        assert json.loads(requests[0].content)["model"] == "configured-model"
+        assert requests[0].extensions["timeout"]["read"] == 45
+    assert provider.is_closed()

@@ -57,6 +57,7 @@ def test_valid_draft_copies_specs(product, draft_data):
         ("search_queries", ["a", "b"]),
         ("search_queries", ["a", "b", "c", "d", "e", "f"]),
         ("search_queries", ["a", "a", "b"]),
+        ("search_queries", ["A", "a", "B"]),
         ("search_queries", ["a", " ", "b"]),
         ("commercial_block", " "),
     ],
@@ -111,3 +112,41 @@ def test_product_name_does_not_authorize_numbers(product, draft_data, name, desc
     draft_data["commercial_block"] = block
     with pytest.raises(ValueError):
         validate_draft(product, Draft.model_validate(draft_data))
+
+
+def test_numeric_formats_are_normalized():
+    from decimal import Decimal
+
+    from product_cards.generation import numbers
+
+    assert numbers("±0,03 гПа; −50 °C; –20,1 °C; +100.0 °C") == {
+        Decimal("0.03"),
+        Decimal("-50"),
+        Decimal("-20.1"),
+        Decimal("100"),
+    }
+
+
+@pytest.mark.parametrize(
+    "block", ["seo_title", "seo_description", "commercial_block", "search_queries"]
+)
+def test_evidence_can_reference_each_output_block(product, draft_data, block):
+    value = draft_data[block]
+    draft_data["evidence"][0]["block"] = block
+    draft_data["evidence"][0]["claim"] = value[0] if isinstance(value, list) else value
+    validate_draft(product, Draft.model_validate(draft_data))
+
+
+def test_product_name_matching_ignores_case(product, draft_data):
+    draft_data["seo_title"] = "Testo 510 — манометр"
+    validate_draft(product, Draft.model_validate(draft_data))
+
+
+def test_all_known_numbers_can_be_reused(product, draft_data):
+    draft_data["commercial_block"] = "Диапазон 0–100 гПа."
+    validate_draft(product, Draft.model_validate(draft_data))
+
+
+def test_numeric_free_product_can_generate_numeric_free_text(product, draft_data):
+    product = product.model_copy(update={"specs": {"Корпус": "ABS"}})
+    validate_draft(product, Draft.model_validate(draft_data))
