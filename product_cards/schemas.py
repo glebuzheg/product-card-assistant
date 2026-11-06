@@ -35,6 +35,13 @@ class Draft(StrictModel):
     commercial_block: Annotated[str, Field(min_length=1, max_length=1000)]
     evidence: Annotated[list[Evidence], Field(min_length=1, max_length=50)]
 
+    @field_validator("seo_title")
+    @classmethod
+    def complete_title(cls, value: str) -> str:
+        if value.endswith(("-", "–", "—", "/", "…")):
+            raise ValueError("Заголовок не должен обрываться")
+        return value
+
     @field_validator("search_queries")
     @classmethod
     def unique_queries(cls, values: list[str]) -> list[str]:

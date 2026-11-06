@@ -123,6 +123,8 @@ def test_repairs_once(client):
     assert response.status_code == 200
     assert len(attempts) == 2
     assert "Исправь" in attempts[1]["input"][-1]["content"]
+    assert attempts[1]["input"][-2]["role"] == "assistant"
+    assert json.loads(attempts[1]["input"][-2]["content"])["seo_title"] == "x" * 71
 
 
 def test_two_invalid_answers_fail_safely(client):
@@ -236,3 +238,14 @@ def test_exhausted_balance_has_actionable_error(client):
     assert response.status_code == 429
     assert "баланс" in response.json()["detail"].lower()
     assert "PRIVATE_DETAIL" not in response.text
+
+
+def test_evidence_source_paths_are_constrained_for_product(client):
+    def handler(request):
+        schema = json.loads(request.content)["text"]["format"]["schema"]
+        fields = schema["$defs"]["Evidence"]["properties"]["source_field"]["enum"]
+        assert set(fields) == {"name", "manufacturer", "description", "specs.Диапазон"}
+        return httpx.Response(200, json=provider_response())
+
+    use_provider(client, handler)
+    assert client.post("/generate", json=PRODUCT).status_code == 200

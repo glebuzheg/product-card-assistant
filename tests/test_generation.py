@@ -50,6 +50,7 @@ def test_valid_draft_copies_specs(product, draft_data):
     "field,value",
     [
         ("seo_title", "x" * 71),
+        ("seo_title", "Манометр 0-"),
         ("seo_title", " "),
         ("seo_description", "x" * 799),
         ("seo_description", "x" * 1201),
