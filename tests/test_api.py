@@ -77,6 +77,7 @@ def provider_response(data=None, *, status="completed", refusal=False):
 
 @pytest.fixture
 def client(monkeypatch):
+    monkeypatch.setattr("product_cards.api.load_dotenv", lambda *args, **kwargs: None)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_MODEL", raising=False)
     with TestClient(app) as c:

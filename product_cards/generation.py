@@ -7,7 +7,7 @@ NUMBER = re.compile(r"(?<!\d)[+−–-]?\d+(?:[.,]\d+)?")
 
 
 def numbers(text: str) -> set[Decimal]:
-    # shortcut: lexical numeric checks cannot prove meaning or units; review drafts before publishing.
+    # shortcut: numeric checks cannot prove meaning or units; review drafts before publishing.
     return {
         Decimal(n.replace(",", ".").replace("−", "-").replace("–", "-"))
         for n in NUMBER.findall(text)
