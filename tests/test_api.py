@@ -202,3 +202,37 @@ def test_streamed_body_limit(client):
 
     response = client.post("/generate", content=chunks())
     assert response.status_code == 413
+
+
+def test_mixed_refusal_is_rejected_without_retry(client):
+    attempts = []
+
+    def handler(request):
+        attempts.append(1)
+        response = provider_response()
+        response["output"][0]["content"].append({"type": "refusal", "refusal": "Cannot generate"})
+        return httpx.Response(200, json=response)
+
+    use_provider(client, handler)
+    assert client.post("/generate", json=PRODUCT).status_code == 502
+    assert len(attempts) == 1
+
+
+def test_exhausted_balance_has_actionable_error(client):
+    use_provider(
+        client,
+        lambda r: httpx.Response(
+            429,
+            json={
+                "error": {
+                    "message": "PRIVATE_DETAIL",
+                    "code": "credit_balance_exhausted",
+                    "type": "insufficient_quota",
+                }
+            },
+        ),
+    )
+    response = client.post("/generate", json=PRODUCT)
+    assert response.status_code == 429
+    assert "баланс" in response.json()["detail"].lower()
+    assert "PRIVATE_DETAIL" not in response.text

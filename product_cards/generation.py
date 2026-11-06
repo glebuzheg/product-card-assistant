@@ -33,9 +33,17 @@ def validate_draft(product: ProductInput, draft: Draft) -> None:
             raise ValueError("Неверная цитата источника")
         if evidence.claim not in blocks[evidence.block]:
             raise ValueError("Утверждение отсутствует в указанном блоке")
-    allowed = numbers("\n".join([product.description, *product.specs.values()]))
+    name_pattern = (
+        re.compile(rf"(?<!\w){re.escape(product.name)}(?!\w)", re.IGNORECASE)
+        if any(char.isalpha() for char in product.name)
+        else None
+    )
+    source_text = "\n".join([product.description, *product.specs.values()])
+    if name_pattern:
+        source_text = name_pattern.sub("", source_text)
+    allowed = numbers(source_text)
     for text in blocks.values():
-        without_name = re.sub(re.escape(product.name), "", text, flags=re.IGNORECASE)
+        without_name = name_pattern.sub("", text) if name_pattern else text
         if not numbers(without_name) <= allowed:
             raise ValueError("В тексте есть неподтверждённые числовые значения")
 
@@ -98,10 +106,22 @@ async def generate_card(product: ProductInput, client, model: str):
         except APITimeoutError as exc:
             raise GenerationError(504, "Превышено время ожидания OpenAI") from exc
         except RateLimitError as exc:
+            if exc.code in {"credit_balance_exhausted", "insufficient_quota"} or (
+                exc.type == "insufficient_quota"
+            ):
+                raise GenerationError(
+                    429, "Исчерпан баланс OpenAI API; проверьте квоту проекта"
+                ) from exc
             raise GenerationError(429, "Лимит OpenAI исчерпан; повторите позже") from exc
         except APIError as exc:
             raise GenerationError(502, "Не удалось получить ответ OpenAI") from exc
-        if response.status != "completed" or not response.output_text:
+        refused = any(
+            content.type == "refusal"
+            for item in response.output
+            if item.type == "message"
+            for content in item.content
+        )
+        if response.status != "completed" or refused or not response.output_text:
             raise GenerationError(502, "Модель отказала или не завершила ответ")
         try:
             draft = Draft.model_validate_json(response.output_text)

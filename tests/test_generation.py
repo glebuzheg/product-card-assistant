@@ -95,3 +95,18 @@ def test_unknown_number_attached_to_unit_is_rejected(product, draft_data):
     draft_data["commercial_block"] = "Класс защиты IP999."
     with pytest.raises(ValueError):
         validate_draft(product, Draft.model_validate(draft_data))
+
+
+@pytest.mark.parametrize(
+    "name,description,block",
+    [
+        ("510", "Измеряет дифференциальное давление.", "Диапазон до 510 гПа."),
+        ("testo 510", "Измеряет дифференциальное давление.", "Для testo 5100."),
+        ("testo 510", "testo 510. Измеряет дифференциальное давление.", "Диапазон до 510 гПа."),
+    ],
+)
+def test_product_name_does_not_authorize_numbers(product, draft_data, name, description, block):
+    product = product.model_copy(update={"name": name, "description": description})
+    draft_data["commercial_block"] = block
+    with pytest.raises(ValueError):
+        validate_draft(product, Draft.model_validate(draft_data))
